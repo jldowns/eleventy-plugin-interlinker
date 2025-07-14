@@ -85,6 +85,51 @@ In cases where you have the `#` in the title of a page you're linking to you can
 
 You can link to pages by their project path, or a path relative to the linking page, for example: `[[/blog/post-1234.md]]` would link to the page found at `/blog/post-1234` relative to the project root path, While `[[../../something.md]]` would link to a page two directories up.
 
+### Image Handling
+
+This plugin automatically detects and handles image files based on their extensions. By default, files with extensions `.png`, `.svg`, `.jpg`, and `.jpeg` are treated as images.
+
+#### Basic Image Wikilinks
+
+Images can be referenced just like regular pages:
+
+- `[[diagram.png]]` - Creates a link to an image file
+- `![[diagram.png]]` - Embeds the image directly in the page as `<img src="diagram.png" alt="diagram.png" />`
+
+Images use their filename directly as the `src` attribute, so they will work as long as the image file exists in your site's output directory.
+
+#### Image Parameters
+
+You can specify image dimensions using the pipe separator:
+
+- `![[diagram.png|500]]` - Renders as `<img src="diagram.png" alt="diagram.png" width="500" />`
+- `![[user-photo.jpg|300]]` - Sets the image width to 300 pixels
+
+#### Image Alt Text
+
+For custom alt text, use descriptive text instead of numbers:
+
+- `![[diagram.png|System Architecture Diagram]]` - Uses "System Architecture Diagram" as alt text
+- `[[photo.jpg|A beautiful sunset]]` - Custom alt text for linked images
+
+#### Case-Insensitive Extensions
+
+The plugin handles extensions in any case:
+
+- `![[IMAGE.PNG]]` - Works correctly
+- `![[photo.JPG]]` - Also works
+- `![[diagram.svg]]` - Case doesn't matter
+
+#### Configuring Image Extensions
+
+You can customize which extensions are treated as images:
+
+```javascript
+eleventyConfig.addPlugin(WikiLinksPlugin, {
+  imageExtensions: ['.png', '.svg', '.jpg', '.jpeg', '.gif', '.webp']
+});
+```
+
 ### Aliases
 
 Aliases provide you a way of referencing a file using different names, use the `aliases` property in your font matter to list one or more aliases that can be used to reference the file from a Wiki Link. For example, you might add _AI_ as an alias of a file titled _Artificial Intelligence_ which would then be linkable via `[[AI]]`.

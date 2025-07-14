@@ -1,13 +1,15 @@
 import WikilinkParser from '../src/wikilink-parser.js';
 import {install} from '../src/markdown-ext.js';
-import {defaultResolvingFn} from '../src/resolvers.js';
+import {defaultResolvingFn, defaultImageFn} from '../src/resolvers.js';
 import MarkdownIt from 'markdown-it';
 import test from 'ava';
 
 const opts = {
   resolvingFns: new Map([
-    ['default', defaultResolvingFn]
+    ['default', defaultResolvingFn],
+    ['default-image', defaultImageFn],
   ]),
+  imageExtensions: ['.png', '.svg', '.jpg', '.jpeg', '.gif']
 };
 
 test('inline rule correctly parses single wikilink', t => {
@@ -79,6 +81,28 @@ test('inline rule correctly parses single wikilink embed', t => {
   t.is(parsed.length, 1);
   t.is(parsed[0].children.length, 3);
   t.is(parsed[0].children.filter(child => child.type === 'html_inline').length, 1);
+});
+
+test('inline rule correctly parses single image', t => {
+  const wikilinkParser = new WikilinkParser(opts, new Set(), new Map());
+  wikilinkParser.linkCache.set('![[wiki image.png]]', {
+    title: 'wiki image',
+    slug: 'wiki-image',
+    href: 'wiki-image.png',
+    isImage: true,
+    content: '<img src="wiki-image.png" alt="wiki image" />',
+  });
+
+  const md = MarkdownIt({html: true});
+  install(md, wikilinkParser);
+
+  const parsed = md.parseInline('Hello world, this is some text with a ![[wiki image.png]] inside!', {});
+
+  t.is(parsed.length, 1);
+  t.is(parsed[0].children.length, 3);
+  t.is(parsed[0].children.filter(child => child.type === 'html_inline').length, 1);
+  t.is(parsed[0].children[1].type, 'html_inline');
+  t.is(parsed[0].children[1].content, '<img src="wiki-image.png" alt="wiki image" />');
 });
 
 test('inline rule correctly parses multiple wikilink embeds', t => {

@@ -1,5 +1,5 @@
 import WikilinkParser from '../src/wikilink-parser.js';
-import {defaultResolvingFn, defaultEmbedFn} from '../src/resolvers.js';
+import {defaultResolvingFn, defaultEmbedFn, defaultImageFn} from '../src/resolvers.js';
 import {pageLookup} from '../src/find-page.js';
 import test from 'ava';
 
@@ -34,8 +34,10 @@ const opts = {
   resolvingFns: new Map([
     ['default', defaultResolvingFn],
     ['default-embed', defaultEmbedFn],
+    ['default-image', defaultImageFn],
   ]),
   stubUrl: '/stubs/',
+  imageExtensions: ['.png', '.svg', '.jpg', '.jpeg', '.gif']
 };
 
 test('parses wikilink', t => {
@@ -214,3 +216,132 @@ test('regex does match special ASCII', t => {
   t.is(parser.find("[[♡ cinni''s dream home ♡|Cinni]]", pageDirectory, '/').length, 1);
   t.is(deadLinks.size, 0);
 })
+
+test('parses image wikilinks correctly', t => {
+  const parser = new WikilinkParser({
+    ...opts,
+    imageExtensions: ['.png', '.jpg', '.jpeg', '.svg', '.gif']
+  }, new Set(), new Map());
+
+  const testCases = [
+    {
+      input: '![[image.png]]',
+      expected: {
+        name: 'image.png',
+        title: null,
+        isImage: true,
+        isEmbed: true,
+        resolvingFnName: 'default-image',
+        href: 'image.png',
+        exists: false
+      }
+    },
+    {
+      input: '![[image.png|500]]',
+      expected: {
+        name: 'image.png',
+        title: '500',
+        isImage: true,
+        isEmbed: true,
+        resolvingFnName: 'default-image',
+        href: 'image.png',
+        exists: false
+      }
+    },
+    {
+      input: '[[photo.JPG]]',
+      expected: {
+        name: 'photo.JPG',
+        title: null,
+        isImage: true,
+        isEmbed: false,
+        resolvingFnName: 'default-image',
+        href: 'photo.JPG',
+        exists: false
+      }
+    },
+    {
+      input: '[[User Diagram.png|Alt text]]',
+      expected: {
+        name: 'User Diagram.png',
+        title: 'Alt text',
+        isImage: true,
+        isEmbed: false,
+        resolvingFnName: 'default-image',
+        href: 'User Diagram.png',
+        exists: false
+      }
+    },
+    {
+      input: '[[document.pdf]]',
+      expected: {
+        name: 'document.pdf',
+        title: null,
+        isImage: false,
+        isEmbed: false,
+        resolvingFnName: 'default'
+      }
+    },
+    {
+      input: '![[animation.GIF|300]]',
+      expected: {
+        name: 'animation.GIF',
+        title: '300',
+        isImage: true,
+        isEmbed: true,
+        resolvingFnName: 'default-image',
+        href: 'animation.GIF',
+        exists: false
+      }
+    }
+  ];
+
+  testCases.forEach(({ input, expected }) => {
+    const result = parser.parseSingle(input, pageDirectory);
+    t.like(result, expected, `Failed for input: ${input}`);
+  });
+});
+
+test('parses Stick Man SVG correctly', t => {
+  const parser = new WikilinkParser(opts, new Set(), new Map());
+
+  // Test simple SVG embed
+  const simpleResult = parser.parseSingle('![[Stick Man.svg]]', pageDirectory);
+  t.like(simpleResult, {
+    name: 'Stick Man.svg',
+    title: null,
+    isImage: true,
+    isEmbed: true,
+    resolvingFnName: 'default-image',
+    href: 'Stick Man.svg', // Should use filename as href
+    exists: false
+  });
+
+  // Test SVG with width parameter
+  const withWidthResult = parser.parseSingle('![[Stick Man.svg|100]]', pageDirectory);
+  t.like(withWidthResult, {
+    name: 'Stick Man.svg',
+    title: '100',
+    isImage: true,
+    isEmbed: true,
+    resolvingFnName: 'default-image',
+    href: 'Stick Man.svg', // Should use filename as href
+    exists: false
+  });
+
+  // Test that the defaultImageFn generates correct HTML with filenames
+  const expectedSimpleHtml = '<img src="Stick Man.svg" alt="Stick Man.svg" />';
+  const expectedWithWidthHtml = '<img src="Stick Man.svg" alt="Stick Man.svg" width="100" />';
+  
+  // Since we don't have the page/interlinker context in this test, we'll test the resolver function directly
+  const defaultImageFn = opts.resolvingFns.get('default-image');
+  
+  return Promise.all([
+    defaultImageFn(simpleResult, {}, {}).then(html => {
+      t.is(html, expectedSimpleHtml);
+    }),
+    defaultImageFn(withWidthResult, {}, {}).then(html => {
+      t.is(html, expectedWithWidthHtml);
+    })
+  ]);
+});

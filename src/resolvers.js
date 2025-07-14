@@ -21,6 +21,34 @@ export const defaultResolvingFn = async (link, currentPage, interlinker) => {
 }
 
 /**
+ * Default Resolving function for converting Wikilinks into image tags.
+ *
+ * @param {import('@photogabble/eleventy-plugin-interlinker').WikilinkMeta} link
+ * @param {*} currentPage
+ * @param {import('./interlinker')} interlinker
+ * @return {Promise<string|undefined>}
+ */
+export const defaultImageFn = async (link, currentPage, interlinker) => {
+  const src = link.href || link.name;
+  
+  // Handle image width/height parameters from the pipe separator
+  // For example: ![[image.png|500]] should set width to 500px
+  let attributes = '';
+  let alt = link.name; // Default to the filename
+  
+  if (link.title && /^\d+$/.test(link.title)) {
+    // If title is just a number, it's a width parameter - use filename for alt
+    attributes = ` width="${link.title}"`;
+    alt = link.name;
+  } else if (link.title) {
+    // If title is not just a number, use it as alt text
+    alt = link.title;
+  }
+  
+  return `<img src="${src}" alt="${alt}"${attributes} />`;
+}
+
+/**
  * Default Resolving function for converting Wikilinks into Embeds.
  *
  * @param {import('@photogabble/eleventy-plugin-interlinker').WikilinkMeta} link

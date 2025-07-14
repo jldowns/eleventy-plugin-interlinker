@@ -7,7 +7,9 @@ import path from "node:path";
 import fs from 'node:fs';
 import test from 'ava';
 
-const opts = {};
+const opts = {
+  imageExtensions: ['.png', '.svg', '.jpg', '.jpeg']
+};
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -76,6 +78,27 @@ test('inline rule correctly parses single embed', t => {
   t.is(
     md.render('Hello world this is a ![[wiki-embed]]'),
     "<p>Hello world this is a <span>Wiki Embed Test</span></p>\n"
+  );
+});
+
+test('inline rule correctly parses image', t => {
+  const wikilinkParser = new WikilinkParser(opts, new Set(), new Map());
+
+  wikilinkParser.linkCache.set('![[wiki-image.png]]', {
+    title: 'Wiki Image',
+    href: 'wiki-image.png',
+    link: '![[wiki-image.png]]',
+    content: '<img src="wiki-image.png" alt="Wiki Image" />',
+    isEmbed: false,
+    isImage: true,
+  });
+
+  const md = MarkdownIt({html: true});
+  install(md, wikilinkParser);
+
+  t.is(
+    md.render('Hello world this is a ![[wiki-image.png]]'),
+    "<p>Hello world this is a <img src=\"wiki-image.png\" alt=\"Wiki Image\" /></p>\n"
   );
 });
 

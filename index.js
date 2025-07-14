@@ -1,6 +1,6 @@
 import {install} from './src/markdown-ext.js';
 import Interlinker from './src/interlinker.js';
-import {defaultResolvingFn, defaultEmbedFn} from './src/resolvers.js';
+import {defaultResolvingFn, defaultEmbedFn, defaultImageFn} from './src/resolvers.js';
 
 /**
  * Some code borrowed from:
@@ -19,6 +19,7 @@ export default function (eleventyConfig, options = {}) {
     layoutTemplateLangKey: 'embedLayoutLanguage',
     resolvingFns: new Map(),
     deadLinkReport: 'console',
+    imageExtensions: ['.png', '.svg', '.jpg', '.jpeg']
   }, options);
 
   // TODO: deprecate usage of unableToLocateEmbedFn in preference of using resolving fn
@@ -32,6 +33,7 @@ export default function (eleventyConfig, options = {}) {
   // Default resolving functions for converting a Wikilink into HTML.
   if (!opts.resolvingFns.has('default')) opts.resolvingFns.set('default', defaultResolvingFn);
   if (!opts.resolvingFns.has('default-embed')) opts.resolvingFns.set('default-embed', defaultEmbedFn);
+  if (!opts.resolvingFns.has('default-image')) opts.resolvingFns.set('default-image', defaultImageFn);
   if (!opts.resolvingFns.has('404-embed')) opts.resolvingFns.set('404-embed', async () => '[UNABLE TO LOCATE EMBED]');
 
   const interlinker = new Interlinker(opts);

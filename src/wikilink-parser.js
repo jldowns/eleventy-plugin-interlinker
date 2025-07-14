@@ -37,6 +37,17 @@ export default class WikilinkParser {
     // defining the link text prefixed by a | character, e.g. `[[ ident | custom link text ]]`
     const parts = link.slice((isEmbed ? 3 : 2), -2).split("|").map(part => part.trim());
 
+    // Wikilinks ending with any of the extensions listed in this.opts.imageExtensions are considered images
+    // We need to check the filename part (parts[0]) rather than the entire link string
+    // Example: `![[User Diagram.png]]` - check "User Diagram.png"
+    // Example: `![[User Diagram.png|500]]` - check "User Diagram.png" (ignore "500")
+    const isImage = this.opts?.imageExtensions?.some(ext => 
+      parts[0].toLowerCase().endsWith(ext.toLowerCase())
+    ) || false;
+
+    // Embed links, image links, and path links have different resolving functions
+    const resolvingFnName = isImage ? 'default-image' : (isEmbed ? 'default-embed' : 'default');
+
     /** @var {import('@photogabble/eleventy-plugin-interlinker').WikilinkMeta} */
     const meta = {
       title: parts.length === 2 ? parts[1] : null,
@@ -46,9 +57,10 @@ export default class WikilinkParser {
       anchor: null,
       link,
       isEmbed,
+      isImage,
       isPath: false,
       exists: false,
-      resolvingFnName: isEmbed ? 'default-embed' : 'default',
+      resolvingFnName,
     };
 
     ////
@@ -122,13 +134,20 @@ export default class WikilinkParser {
       meta.path = page.inputPath;
       meta.exists = true;
       meta.page = page;
+    } else if (isImage) {
+      // Images should use their filename directly as href, not stub URLs
+      meta.href = meta.name;
+      meta.exists = false; // Images don't exist as pages, but they exist as files
     } else if (['default', 'default-embed'].includes(meta.resolvingFnName)) {
       // If this wikilink goes to a page that doesn't exist, add to deadLinks list and
       // update href for stub post.
       this.deadLinks.add(link);
       meta.href = this.opts.stubUrl;
 
-      if (isEmbed) meta.resolvingFnName = '404-embed';
+      // Update resolving function name for non-existent links
+      if (isEmbed && !isImage) {
+        meta.resolvingFnName = '404-embed';
+      }
     }
 
     // Cache discovered meta to link, this cache can then be used by the Markdown render rule

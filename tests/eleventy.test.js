@@ -23,7 +23,7 @@ test("Sample small Website (wikilinks and regular links)", async t => {
 
   let results = await elev.toJSON();
 
-  t.is(results.length, 10);
+  t.is(results.length, 11);
 
   t.is(
     normalize(findResultByUrl(results, '/about/').content),
@@ -321,5 +321,40 @@ test("Wikilinks within code blocks get ignored", async t => {
   t.is(
     normalize(findResultByUrl(results, '/within-code/').content),
     `<h1>Test Markdown File</h1><pre><code>[[Wiki Link]]</code></pre><p>This contains a wiki link <code>[[Wiki Link]]</code> within an inline code element. This sentence does not: <a href="/wiki-link/">Wiki Link</a>.</p>`
+  );
+});
+
+test("Stick Man SVG renders correctly", async t => {
+  let elev = new Eleventy(fixturePath('sample-small-website'), fixturePath('sample-small-website/_site'), {
+    configPath: fixturePath('sample-small-website/eleventy.config.js'),
+  });
+
+  let results = await elev.toJSON();
+
+  let stickManPage = findResultByUrl(results, '/sitck man/');
+  if (!stickManPage) {
+    // Try alternative URL patterns
+    stickManPage = findResultByUrl(results, '/stick-man/') || 
+                   results.find(r => r.url.includes('stick') || r.url.includes('sitck'));
+    
+    if (!stickManPage) {
+      t.fail('Could not find Stick Man page');
+      return;
+    }
+  }
+  
+  const normalizedContent = normalize(stickManPage.content);
+  
+  // Images should render with their filename as src, not stub URLs
+  t.true(normalizedContent.includes('<img src="Stick Man.svg" alt="Stick Man.svg" />'), 
+    'Simple SVG embed should render as img tag with filename as src');
+  
+  t.true(normalizedContent.includes('<img src="Stick Man.svg" alt="Stick Man.svg" width="100" />'), 
+    'SVG with width parameter should render with width attribute and filename as src');
+  
+  // Test the full expected content structure
+  t.is(
+    normalizedContent,
+    `<div><p>Here is a stick man:</p><img src="Stick Man.svg" alt="Stick Man.svg" /><p>Here he is, smaller:</p><img src="Stick Man.svg" alt="Stick Man.svg" width="100" /></div><div></div>`
   );
 });
