@@ -86,9 +86,9 @@ export const imageEmbedFn = async (link, currentPage, interlinker) => {
 
   let src = link.href;
   
-  // For simple filenames, use relative path with ./ prefix
-  if (src.startsWith('/') && !src.includes('/', 1)) {
-    src = './' + src.substring(1);
+  // Always use full non-relative links starting with '/'
+  if (!src.startsWith('/')) {
+    src = '/' + src;
   }
   
   // Use the image name (filename without extension) as alt text

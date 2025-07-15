@@ -334,11 +334,11 @@ test("Wiki images are parsed and rendered correctly", async t => {
     let stickManPage = findResultByUrl(results, '/home/');
     const normalizedContent = normalize(stickManPage.content);
     
-    t.true(normalizedContent.includes('This is a stick man: <img src="./stick man.svg" alt="stick man" />'), 
+    t.true(normalizedContent.includes('This is a stick man: <img src="/stick man.svg" alt="stick man" />'), 
       'Simple wiki image');
-    t.true(normalizedContent.includes('This is a smaller stick man: <img src="./stick man.svg" alt="stick man" width="100px" />'), 
+    t.true(normalizedContent.includes('This is a smaller stick man: <img src="/stick man.svg" alt="stick man" width="100px" />'), 
       'Wiki image resize');
-    t.true(normalizedContent.includes('Only the first number is significant: <img src="./stick man.svg" alt="stick man" width="100px" />'), 
+    t.true(normalizedContent.includes('Only the first number is significant: <img src="/stick man.svg" alt="stick man" width="100px" />'), 
       'Wiki image full resize');
     t.true(normalizedContent.includes('Relative link should work: <img src="/figs/square.png" alt="square" />'), 
       'Relative image link');
