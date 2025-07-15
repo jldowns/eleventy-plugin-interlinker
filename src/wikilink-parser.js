@@ -1,3 +1,6 @@
+import fs from 'node:fs';
+import path from 'node:path';
+
 export default class WikilinkParser {
   /**
    * This regex finds all WikiLink style links: [[id|optional text]] as well as WikiLink style embeds: ![[id]]
@@ -5,6 +8,109 @@ export default class WikilinkParser {
    * @type {RegExp}
    */
   wikiLinkRegExp = /(?<!!)(!?)\[\[([^|\n]+?)(\|([^\n]+?))?]]/g;
+
+  /**
+   * Check if a filename is an image file by extension
+   * @param {string} filename
+   * @return {boolean}
+   */
+  isImageFile(filename) {
+    const imageExtensions = ['.jpg', '.jpeg', '.png', '.gif', '.svg', '.webp'];
+    return imageExtensions.some(ext => filename.toLowerCase().endsWith(ext));
+  }
+
+  /**
+   * Find an image file in the filesystem
+   * @param {string} imagePath - The image path to look for
+   * @param {string} baseDir - The base directory to search from
+   * @param {string|undefined} filePathStem - The current file path stem for relative lookups
+   * @return {Object|null} - Returns {exists: boolean, href: string, fullPath: string} or null
+   */
+  findImageFile(imagePath, baseDir, filePathStem) {
+    // Handle absolute paths starting with /
+    if (imagePath.startsWith('/')) {
+      const fullPath = path.join(baseDir, imagePath.substring(1));
+      const exists = fs.existsSync(fullPath);
+      return {
+        exists,
+        href: imagePath,
+        fullPath
+      };
+    }
+
+    // Handle relative paths (./ or ../)
+    if (imagePath.startsWith('./') || imagePath.startsWith('../')) {
+      if (!filePathStem) return null;
+      
+      const currentDir = path.dirname(filePathStem);
+      const fullPath = path.resolve(path.join(baseDir, currentDir), imagePath);
+      const exists = fs.existsSync(fullPath);
+      const relativePath = path.relative(baseDir, fullPath);
+      
+      return {
+        exists,
+        href: '/' + relativePath.replace(/\\/g, '/'),
+        fullPath
+      };
+    }
+
+    // Handle simple filename - search in current directory and baseDir recursively
+    const searchPaths = [];
+    
+    // First try current directory if we have filePathStem
+    if (filePathStem) {
+      const currentDir = path.dirname(filePathStem);
+      searchPaths.push(path.join(baseDir, currentDir, imagePath));
+    }
+    
+    // Then try base directory
+    searchPaths.push(path.join(baseDir, imagePath));
+    
+    // Search for the file recursively in subdirectories
+    const findFileRecursively = (dir, filename) => {
+      try {
+        const files = fs.readdirSync(dir);
+        for (const file of files) {
+          const fullPath = path.join(dir, file);
+          const stat = fs.statSync(fullPath);
+          
+          if (stat.isFile() && file === filename) {
+            return fullPath;
+          } else if (stat.isDirectory()) {
+            const found = findFileRecursively(fullPath, filename);
+            if (found) return found;
+          }
+        }
+      } catch (e) {
+        // Ignore errors accessing directories
+      }
+      return null;
+    };
+
+    for (const searchPath of searchPaths) {
+      if (fs.existsSync(searchPath)) {
+        const relativePath = path.relative(baseDir, searchPath);
+        return {
+          exists: true,
+          href: '/' + relativePath.replace(/\\/g, '/'),
+          fullPath: searchPath
+        };
+      }
+    }
+    
+    // If not found in direct paths, search recursively
+    const foundPath = findFileRecursively(baseDir, imagePath);
+    if (foundPath) {
+      const relativePath = path.relative(baseDir, foundPath);
+      return {
+        exists: true,
+        href: '/' + relativePath.replace(/\\/g, '/'),
+        fullPath: foundPath
+      };
+    }
+
+    return null;
+  }
 
   /**
    * @param { import('@photogabble/eleventy-plugin-interlinker').EleventyPluginInterlinkOptions } opts
@@ -15,6 +121,15 @@ export default class WikilinkParser {
     this.opts = opts;
     this.deadLinks = deadLinks;
     this.linkCache = linkCache;
+    this.inputDir = process.cwd(); // Default to current working directory
+  }
+
+  /**
+   * Set the input directory for image file lookups
+   * @param {string} inputDir
+   */
+  setInputDir(inputDir) {
+    this.inputDir = inputDir;
   }
 
   /**
@@ -49,6 +164,7 @@ export default class WikilinkParser {
       isPath: false,
       exists: false,
       resolvingFnName: isEmbed ? 'default-embed' : 'default',
+      isImage: false,
     };
 
     ////
@@ -110,25 +226,53 @@ export default class WikilinkParser {
       }
     }
 
-    // Lookup page data from 11ty's collection to obtain url and title if currently null
-    const {page, foundByAlias} = pageDirectory.findByLink(meta);
-    if (page) {
-      if (foundByAlias) {
-        meta.title = meta.name;
-      } else if (meta.title === null && page.data.title) {
-        meta.title = page.data.title;
+    // Check if this is an image embed
+    if (isEmbed && this.isImageFile(meta.name)) {
+      meta.isImage = true;
+      meta.resolvingFnName = 'image-embed';
+      
+      // Try to find the image file in the filesystem
+      const imageResult = this.findImageFile(meta.name, this.inputDir, filePathStem);
+      
+      if (imageResult && imageResult.exists) {
+        meta.exists = true;
+        meta.href = imageResult.href;
+        meta.path = imageResult.fullPath;
+        
+        // Set default title to filename without extension if no title provided
+        if (!meta.title) {
+          meta.title = path.basename(meta.name, path.extname(meta.name));
+        }
+      } else {
+        // Image not found, treat as dead link
+        this.deadLinks.add(link);
+        meta.href = this.opts.stubUrl;
+        meta.resolvingFnName = '404-embed';
       }
-      meta.href = page.url;
-      meta.path = page.inputPath;
-      meta.exists = true;
-      meta.page = page;
-    } else if (['default', 'default-embed'].includes(meta.resolvingFnName)) {
-      // If this wikilink goes to a page that doesn't exist, add to deadLinks list and
-      // update href for stub post.
-      this.deadLinks.add(link);
-      meta.href = this.opts.stubUrl;
+    }
 
-      if (isEmbed) meta.resolvingFnName = '404-embed';
+    // Lookup page data from 11ty's collection to obtain url and title if currently null
+    // Skip page lookup for images since they are already handled above
+    if (!meta.isImage) {
+      const {page, foundByAlias} = pageDirectory.findByLink(meta);
+      if (page) {
+        if (foundByAlias) {
+          meta.title = meta.name;
+        } else if (meta.title === null && page.data.title) {
+          meta.title = page.data.title;
+        }
+        meta.href = page.url;
+        meta.path = page.inputPath;
+        meta.exists = true;
+        meta.page = page;
+      } else if (['default', 'default-embed'].includes(meta.resolvingFnName)) {
+        // If this wikilink goes to a page that doesn't exist, add to deadLinks list and
+        // update href for stub post.
+        this.deadLinks.add(link);
+        meta.href = this.opts.stubUrl;
+
+        if (isEmbed) meta.resolvingFnName = '404-embed';
+      }
     }
 
     // Cache discovered meta to link, this cache can then be used by the Markdown render rule

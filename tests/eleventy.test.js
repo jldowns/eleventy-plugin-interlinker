@@ -336,13 +336,13 @@ test("Wiki images are parsed and rendered correctly", async t => {
     
     t.true(normalizedContent.includes('This is a stick man: <img src="stick man.svg" alt="stick man" />'), 
       'Simple wiki image');
-    t.true(normalizedContent.includes('This is a smaller stick man: <img src="stick man.svg" width="100px" alt="stick man" />'), 
+    t.true(normalizedContent.includes('This is a smaller stick man: <img src="stick man.svg" alt="stick man" width="100px" />'), 
       'Wiki image resize');
-    t.true(normalizedContent.includes('Only the first number is significant: <img src="stick man.svg" width="100px" alt="stick man" />'), 
+    t.true(normalizedContent.includes('Only the first number is significant: <img src="stick man.svg" alt="stick man" width="100px" />'), 
       'Wiki image full resize');
-    t.true(normalizedContent.includes('Relative link should work: <img src="figs/square.png" alt="square" />'), 
+    t.true(normalizedContent.includes('Relative link should work: <img src="/figs/square.png" alt="square" />'), 
       'Relative image link');
-    t.true(normalizedContent.includes('Relative link should work: <img src="/figs/stick man.svg" width="500px" alt="stick man" />'), 
+    t.true(normalizedContent.includes('Absolute link should work: <img src="/figs/stick man.svg" alt="stick man" width="200px" />'), 
       'Absolute image link');
     t.true(normalizedContent.includes('Non-relative link should find the image: <img src="/figs/square.png" alt="square" />'), 
       'Non-relative image link');

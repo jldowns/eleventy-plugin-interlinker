@@ -82,7 +82,8 @@ export default class Interlinker {
         }
 
         // If the linked page exists we can add the linking page to its backlinks array
-        if (link.exists) {
+        // Skip backlinks for images since they don't have page data
+        if (link.exists && link.page && link.page.data) {
           if (!link.page.data.backlinks) link.page.data.backlinks = [];
           if (link.page.data.backlinks.findIndex((backlink => backlink.url === currentPage.url)) === -1) {
             link.page.data.backlinks.push({

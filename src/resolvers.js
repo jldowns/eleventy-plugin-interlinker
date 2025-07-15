@@ -72,3 +72,49 @@ export const defaultEmbedFn = async (link, currentPage, interlinker) => {
 
   return await tplFn({content, ...page.data});
 }
+
+/**
+ * Image Embed Resolving function for converting image wikilinks into img tags.
+ *
+ * @param {import('@photogabble/eleventy-plugin-interlinker').WikilinkMeta} link
+ * @param {*} currentPage
+ * @param {import('./interlinker')} interlinker
+ * @return {Promise<string|undefined>}
+ */
+export const imageEmbedFn = async (link, currentPage, interlinker) => {
+  if (!link.exists || !link.isImage) return;
+
+  let src = link.href;
+  
+  // For simple filenames, use relative path (no leading slash)
+  if (src.startsWith('/') && !src.includes('/', 1)) {
+    src = src.substring(1);
+  }
+  
+  // Use the image name (filename without extension) as alt text
+  const imageName = link.name.split('/').pop(); // Get filename from path
+  const imageTitle = imageName.replace(/\.[^/.]+$/, ''); // Remove extension
+  
+  let alt = encodeHTML(imageTitle);
+  let width = null;
+  
+  // Parse width from title if present (e.g., "100" or "100x500")
+  if (link.title) {
+    const sizeMatch = link.title.match(/^(\d+)(?:x\d+)?$/);
+    if (sizeMatch) {
+      width = sizeMatch[1];
+    } else {
+      // If title is not a size, use it as alt text
+      alt = encodeHTML(link.title);
+    }
+  }
+  
+  // Build img tag
+  let imgTag = `<img src="${src}" alt="${alt}"`;
+  if (width) {
+    imgTag += ` width="${width}px"`;
+  }
+  imgTag += ' />';
+  
+  return imgTag;
+}
