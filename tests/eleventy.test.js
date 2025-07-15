@@ -323,3 +323,29 @@ test("Wikilinks within code blocks get ignored", async t => {
     `<h1>Test Markdown File</h1><pre><code>[[Wiki Link]]</code></pre><p>This contains a wiki link <code>[[Wiki Link]]</code> within an inline code element. This sentence does not: <a href="/wiki-link/">Wiki Link</a>.</p>`
   );
 });
+
+test("Wiki images are parsed and rendered correctly", async t => {
+    let elev = new Eleventy(fixturePath('wiki-image-website'), fixturePath('wiki-image-website/_site'), {
+      configPath: fixturePath('wiki-image-website/eleventy.config.js'),
+    });
+  
+    let results = await elev.toJSON();
+  
+    let stickManPage = findResultByUrl(results, '/home/');
+    const normalizedContent = normalize(stickManPage.content);
+    
+    t.true(normalizedContent.includes('This is a stick man: <img src="stick man.svg" alt="stick man" />'), 
+      'Simple wiki image');
+    t.true(normalizedContent.includes('This is a smaller stick man: <img src="stick man.svg" width="100px" alt="stick man" />'), 
+      'Wiki image resize');
+    t.true(normalizedContent.includes('Only the first number is significant: <img src="stick man.svg" width="100px" alt="stick man" />'), 
+      'Wiki image full resize');
+    t.true(normalizedContent.includes('Relative link should work: <img src="figs/square.png" alt="square" />'), 
+      'Relative image link');
+    t.true(normalizedContent.includes('Relative link should work: <img src="/figs/stick man.svg" width="500px" alt="stick man" />'), 
+      'Absolute image link');
+    t.true(normalizedContent.includes('Non-relative link should find the image: <img src="/figs/square.png" alt="square" />'), 
+      'Non-relative image link');
+    
+});
+  
